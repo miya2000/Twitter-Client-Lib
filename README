@@ -1,3 +1,5 @@
+// oauth.js sha1.js 
+// http://oauth.googlecode.com/svn/code/javascript/
 
 
 var clientInfo = {
@@ -21,8 +23,7 @@ client.addEventListener('error', function(e) {
 function verifyClient() {
     var pin = document.getElementById('PIN').value;
     client.verifyClient(pin, function() {
-        widget.setPreferenceForKey(client.accessor.token, 'oauth_token');
-        widget.setPreferenceForKey(client.accessor.tokenSecret, 'oauth_token_secret');
+        //
     });
     return false;
 }
