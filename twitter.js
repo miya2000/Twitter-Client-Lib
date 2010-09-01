@@ -113,7 +113,7 @@ TC.prototype.handleResponseCode = function handleResponseCode(xhr, agent) {
             agent: agent
         });
     }
-    else if (xhr.status != '200') {
+    else {
         this.dispatchEvent({
             type : 'error',
             response: xhr,
@@ -162,7 +162,7 @@ function TwitterAPIAgent(client, api) {
             data = null;
         }
         var x = client.createHttpRequest();
-        x.open(message.method, message.action, self.asynch != null ? self.asynch || true);
+        x.open(message.method, message.action, self.asynch != null ? self.asynch : true);
         if (/^post$/i.test(message.method)) {
             x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
         }
