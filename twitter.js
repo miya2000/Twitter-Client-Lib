@@ -64,7 +64,7 @@ TC.prototype.createAgent = function(method) {
     }
     return new Twitter.APIAgent(this, Twitter.API[method]);
 };
-TC.prototype.requestToken = function requestToken(callback) {
+TC.prototype.requestToken = function requestToken(callback, errorback) {
     var agent = this.createAgent('oauth/request_token');
     var req = agent.send();
     var self = this;
@@ -74,13 +74,16 @@ TC.prototype.requestToken = function requestToken(callback) {
             self.registerCredential(rr['oauth_token'], rr['oauth_token_secret']);
             if (callback) callback.apply(this, [req]);
         }
+        else {
+            if (errorback) errorback.apply(this, [req]);
+        }
     };
 };
 TC.prototype.getAuthorizeURL = function getAuthorizeURL() {
     if (!this.accessor.token) throw new Error('accessor.token not set.');
     return Twitter.API['oauth/authorize'].url + '?oauth_token=' + this.accessor.token;
 };
-TC.prototype.verifyClient = function verifyClient(pin, callback) {
+TC.prototype.verifyClient = function verifyClient(pin, callback, errorback) {
     var agent = this.createAgent('oauth/access_token');
     agent.oparams = { 'oauth_verifier' : pin };
     var req = agent.send();
@@ -91,15 +94,21 @@ TC.prototype.verifyClient = function verifyClient(pin, callback) {
             self.registerCredential(rr['oauth_token'], rr['oauth_token_secret']);
             if (callback) callback.apply(this, [req]);
         }
+        else {
+            if (errorback) errorback.apply(this, [req]);
+        }
     };
 };
-TC.prototype.verifyCredentials = function(callback) {
+TC.prototype.verifyCredentials = function(callback, errorback) {
     var agent = this.createAgent('account/verify_credentials');
     var req = agent.send();
     var self = this;
     req.onload = function() {
         if (self.handleResponseCode(req, agent)) {
             if (callback) callback.apply(this, [req]);
+        }
+        else {
+            if (errorback) errorback.apply(this, [req]);
         }
     };
 };
@@ -113,7 +122,7 @@ TC.prototype.handleResponseCode = function handleResponseCode(xhr, agent) {
             agent: agent
         });
     }
-    else if (xhr.status != '200') {
+    else {
         this.dispatchEvent({
             type : 'error',
             response: xhr,
@@ -144,7 +153,7 @@ function TwitterAPIAgent(client, api) {
         if (api.formats) {
             url = url.replace(/\.format$/, '.' + (self.format || api.formats[0]));
         }
-        if (api.params && api.params.id && self.params && self.params.id) {
+        if (api.params && ('id' in api.params) && self.params && self.params.id) {
             url = url.replace(/\/id\.(\w+)$/, '/' + self.params.id + '.$1');
         }
         return url;
@@ -155,14 +164,25 @@ function TwitterAPIAgent(client, api) {
             method: self.method || api.method,
             parameters : {}
         };
+        
+        var params = {};
+        if (self.params) {
+            for (var k in self.params) {
+                if (k in api.params) {
+                    params[k] = self.params[k];
+                }
+            }
+        }
+        if (params.id) delete params.id; // @see #buildURL
+        
         var headers = self.headers || {};
-        var data = self.params ? OAuth.formEncode(self.params) : null;
+        var data = self.params ? OAuth.formEncode(params) : null;
         if (!/^post$/i.test(message.method) && data) {
             message.action = message.action + '?' + data;
             data = null;
         }
         var x = client.createHttpRequest();
-        x.open(message.method, message.action, self.asynch != null ? self.asynch || true);
+        x.open(message.method, message.action, self.async != null ? self.async : true);
         if (/^post$/i.test(message.method)) {
             x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
         }
@@ -170,7 +190,7 @@ function TwitterAPIAgent(client, api) {
             x.setRequestHeader('User-Agent', client.info.userAgent);
         }
         if (self.auth != null ? self.auth : api.auth) {
-            if (self.params ) OAuth.setParameters(message, self.params);
+            if (data        ) OAuth.setParameters(message, params);
             if (self.oparams) OAuth.setParameters(message, self.oparams);
             OAuth.completeRequest(message, client.accessor);
             x.setRequestHeader('Authorization', OAuth.getAuthorizationHeader(client.info.realm || client.info.name, message.parameters));
